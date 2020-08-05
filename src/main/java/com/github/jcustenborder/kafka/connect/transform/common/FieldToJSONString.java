@@ -70,8 +70,8 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
         final Schema outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
             final Field inputField = inputSchema.field(this.config.inputFieldName);
             final SchemaBuilder builder = SchemaBuilder.struct();
-            for (Field inputField : inputSchema.fields()) {
-                builder.field(inputField.name(), inputField.schema());
+            for (Field inputFieldAux : inputSchema.fields()) {
+                builder.field(inputFieldAux.name(), inputFieldAux.schema());
             }
             builder.field(this.config.inputFieldName, inputField.schema());
             return builder.build();
@@ -88,7 +88,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
         // Converting to byte buffer
         final byte[] buffer = this.converter.fromConnectData("dummy", inputFieldStruct.schema(), inputFieldObject);
         // Encode buffer in UTF_8 string
-        inputFieldValue = new String(buffer, Charsets.UTF_8);
+        String inputFieldValue = new String(buffer, Charsets.UTF_8);
         // Append the value in outputStruct
         outputStruct.put(this.config.inputFieldName, inputFieldValue);
 
