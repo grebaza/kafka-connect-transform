@@ -70,8 +70,8 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
         final Schema outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
             final Field inputField = inputSchema.field(this.config.inputFieldName);
             final SchemaBuilder builder = SchemaBuilder.struct();
-            for (Field inputFieldAux : inputSchema.fields()) {
-                builder.field(inputFieldAux.name(), inputFieldAux.schema());
+            for (Field elementField : inputSchema.fields()) {
+                builder.field(elementField.name(), elementField.schema());
             }
             builder.field(this.config.inputFieldName, inputField.schema());
             return builder.build();

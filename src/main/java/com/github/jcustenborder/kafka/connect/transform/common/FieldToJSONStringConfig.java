@@ -31,7 +31,7 @@ public class FieldToJSONStringConfig extends AbstractConfig {
     }
 
     public static final String INPUT_FIELD_NAME_CONF = "input.field.name";
-    static final String INPUT_FIELD_NAME_DOC = "The field on the struct to be JSON stringify. ";
+    static final String INPUT_FIELD_NAME_DOC = "The field on the struct to be JSON stringify. "
     public static final String OUTPUT_FIELD_NAME_CONF = "output.field.name";
     static final String OUTPUT_FIELD_NAME_DOC = "The field to place the JSON stringify value into.";
 
