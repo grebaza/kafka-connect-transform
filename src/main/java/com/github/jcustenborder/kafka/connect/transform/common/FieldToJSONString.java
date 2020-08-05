@@ -61,7 +61,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     }
 
     @Override
-    protected SchemaAndValue processStruct(R record, Schema inputSchema, Struct input) {
+    protected SchemaAndValue processStruct(R record, Schema inputSchema, Object input) {
         // Input in Object and Struct fashion
         final Object inputFieldObject = input.get(this.config.inputFieldName);
         final Struct inputFieldStruct = input.getStruct(this.config.inputFieldName);
