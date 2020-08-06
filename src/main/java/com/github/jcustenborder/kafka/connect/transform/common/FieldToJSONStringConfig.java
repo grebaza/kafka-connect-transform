@@ -15,6 +15,7 @@
  */
 package com.github.jcustenborder.kafka.connect.transform.common;
 
+import com.github.jcustenborder.kafka.connect.utils.config.ConfigKeyBuilder;
 import com.github.jcustenborder.kafka.connect.utils.config.ConfigUtils;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
@@ -60,6 +61,19 @@ public class FieldToJSONStringConfig extends AbstractConfig {
       .define(
         SCHEMAS_ENABLE_CONFIG, ConfigDef.Type.BOOLEAN, false,
         ConfigDef.Importance.MEDIUM, SCHEMAS_ENABLE_DOC
+       )
+      .define(
+          ConfigKeyBuilder.of(OUTPUT_SCHEMA_CONFIG, ConfigDef.Type.STRING)
+          .documentation(OUTPUT_SCHEMA_DOC)
+          .defaultValue(Schema.Type.STRING.toString())
+          .validator(
+            ConfigDef.ValidString.in(
+              Schema.Type.STRING.toString(),
+              Schema.Type.BYTES.toString()
+              )
+            )
+          .importance(ConfigDef.Importance.MEDIUM)
+          .build()
        );
   }
 
