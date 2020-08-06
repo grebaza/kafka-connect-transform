@@ -54,7 +54,7 @@ public class FieldToJSONStringConfig extends AbstractConfig {
       .define(
         SCHEMAS_ENABLE_CONFIG, ConfigDef.Type.BOOLEAN, false,
         ConfigDef.Importance.MEDIUM, SCHEMAS_ENABLE_DOC
-       )
+       );
   }
 
 }

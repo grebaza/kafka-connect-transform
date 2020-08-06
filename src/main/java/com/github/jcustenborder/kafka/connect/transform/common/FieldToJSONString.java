@@ -58,14 +58,19 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     this.config = new FieldToJSONStringConfig(map);
     this.schemaCache = new HashMap<>(); //TODO: Review
     // JsonConverter setup
-    Map<String, Object> settingsClone = new LinkedHashMap<>(settings);
+    Map<String, Object> settingsClone = new LinkedHashMap<>(map);
     settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
         this.config.schemasEnable);
     this.converter.configure(settingsClone, false);
   }
 
-  SchemaAndValue schemaAndValue(Schema inputSchema, Object input) {
-    //TODO
+  @Override
+  protected SchemaAndValue processString(R record, Schema inputSchema, String input) {
+    return new SchemaAndValue(inputSchema, input);
+  }
+
+  SchemaAndValue schemaAndValue(Schema inputSchema, Struct input) {
+    
     // Input in Object and Struct fashion
     final Object inputFieldObject = input.get(this.config.inputFieldName);
     final Struct inputFieldStruct = input.getStruct(this.config.inputFieldName);
