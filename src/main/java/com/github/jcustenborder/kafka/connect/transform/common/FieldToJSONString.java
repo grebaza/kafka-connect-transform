@@ -36,107 +36,121 @@ import java.util.HashMap;
 import java.util.Map;
 
 public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends BaseTransformation<R> {
-    private static final Logger log = LoggerFactory.getLogger(FieldToJSONString.class);
+  private static final Logger log = LoggerFactory.getLogger(FieldToJSONString.class);
 
+  FieldToJSONStringConfig config;
+  Map<Schema, Schema> schemaCache;
 
-    @Override
-    public ConfigDef config() {
-        return FieldToJSONStringConfig.config();
-    }
+  @Override
+  public ConfigDef config() {
+    return FieldToJSONStringConfig.config();
+  }
 
-    @Override
-    public void close() {
+  @Override
+  public void close() {
 
-    }
+  }
 
-    JsonConverter converter = new JsonConverter();
+  JsonConverter converter = new JsonConverter();
 
-    FieldToJSONStringConfig config;
-    Map<Schema, Schema> schemaCache;
+  @Override
+  public void configure(Map<String, ?> map) {
+    this.config = new FieldToJSONStringConfig(map);
+    this.schemaCache = new HashMap<>(); //TODO: Review
+    // JsonConverter setup
+    Map<String, Object> settingsClone = new LinkedHashMap<>(settings);
+    settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
+        this.config.schemasEnable);
+    this.converter.configure(settingsClone, false);
+  }
 
-    @Override
-    public void configure(Map<String, ?> map) {
-        this.config = new FieldToJSONStringConfig(map);
-        this.schemaCache = new HashMap<>();
-    }
+  SchemaAndValue schemaAndValue(Schema inputSchema, Object input) {
+    //TODO
+    // Input in Object and Struct fashion
+    final Object inputFieldObject = input.get(this.config.inputFieldName);
+    final Struct inputFieldStruct = input.getStruct(this.config.inputFieldName);
 
-    @Override
-    protected SchemaAndValue processStruct(R record, Schema inputSchema, Object input) {
-        // Input in Object and Struct fashion
-        final Object inputFieldObject = input.get(this.config.inputFieldName);
-        final Struct inputFieldStruct = input.getStruct(this.config.inputFieldName);
-
-        // Schema
-        final Schema outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
-            final Field inputField = inputSchema.field(this.config.inputFieldName);
-            final SchemaBuilder builder = SchemaBuilder.struct();
-            for (Field elementField : inputSchema.fields()) {
-                builder.field(elementField.name(), elementField.schema());
-            }
-            builder.field(this.config.inputFieldName, inputField.schema());
-            return builder.build();
-        });
-
-        // Value
-        // Creating outputStruct (all values of struct)
-        final Struct outputStruct = new Struct(outputSchema);
-        for (Field inputField : inputSchema.fields()) {
-            final Object value = input.get(inputField);
-            outputStruct.put(inputField.name(), value);
+    // Schema
+    final Schema outputSchema = this.schemaCache
+      .computeIfAbsent(inputSchema, s -> {
+        final Field inputField = inputSchema.field(this.config.inputFieldName);
+        final SchemaBuilder builder = SchemaBuilder.struct();
+        for (Field elementField : inputSchema.fields()) {
+          builder.field(elementField.name(), elementField.schema());
         }
-        // Adding the input in JSON string type
-        // Converting to byte buffer
-        final byte[] buffer = this.converter.fromConnectData("dummy", inputFieldStruct.schema(), inputFieldObject);
-        // Encode buffer in UTF_8 string
-        String inputFieldValue = new String(buffer, Charsets.UTF_8);
-        // Append the value in outputStruct
-        outputStruct.put(this.config.inputFieldName, inputFieldValue);
+        builder.field(this.config.inputFieldName, inputField.schema());
+        return builder.build();
+      }
+    );
 
-        return new SchemaAndValue(outputSchema, outputStruct);
+    // Value
+    // Creating outputStruct (all values of struct)
+    final Struct outputStruct = new Struct(outputSchema);
+    for (Field inputField : inputSchema.fields()) {
+      final Object value = input.get(inputField);
+      outputStruct.put(inputField.name(), value);
     }
+    // Adding the input in JSON string type
+    // Converting to byte buffer
+    final byte[] buffer = this.converter.fromConnectData("dummy",
+        inputFieldStruct.schema(), inputFieldObject);
+    // Encode buffer in UTF_8 string
+    String inputFieldValue = new String(buffer, Charsets.UTF_8);
+    // Append the value in outputStruct
+    outputStruct.put(this.config.inputFieldName, inputFieldValue);
 
+    return new SchemaAndValue(outputSchema, outputStruct);
+  }
 
-    @Title("FieldToJSONString(Key)")
-    @Description("This transformation is used to extract a field from a nested struct and append it " +
-            "to the parent struct in JSON string.")
-    @DocumentationTip("This transformation is used to manipulate fields in the Key of the record.")
-    public static class Key<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
+  @Override
+  protected SchemaAndValue processStruct(R record, Schema inputSchema, Struct input) {
+    return schemaAndValue(inputSchema, input);
+  }
 
-        @Override
-        public R apply(R r) {
-            final SchemaAndValue transformed = process(r, r.keySchema(), r.key());
+  @Title("FieldToJSONString(Key)")
+  @Description("This transformation is used to extract a field from a "+
+               "nested struct and append it to the parent struct in "+
+               "JSON string.")
+  @DocumentationTip("This transformation is used to manipulate fields in "+
+                    "the Key of the record.")
+  public static class Key<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
 
-            return r.newRecord(
-                    r.topic(),
-                    r.kafkaPartition(),
-                    transformed.schema(),
-                    transformed.value(),
-                    r.valueSchema(),
-                    r.value(),
-                    r.timestamp()
-            );
-        }
+    @Override
+    public R apply(R r) {
+      final SchemaAndValue transformed = process(r, r.keySchema(), r.key());
+
+      return r.newRecord(
+          r.topic(),
+          r.kafkaPartition(),
+          transformed.schema(),
+          transformed.value(),
+          r.valueSchema(),
+          r.value(),
+          r.timestamp()
+          );
     }
+  }
 
-    @Title("FieldToJSONString(Value)")
-    @Description("This transformation is used to extract a field from a nested struct and append it " +
-            "to the parent struct in JSON string.")
-    public static class Value<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
+  @Title("FieldToJSONString(Value)")
+  @Description("This transformation is used to extract a field from a " +
+    "nested struct and append it to the parent struct in " +
+    "JSON string.")
+  public static class Value<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
 
-        @Override
-        public R apply(R r) {
-            final SchemaAndValue transformed = process(r, r.valueSchema(), r.value());
+    @Override
+    public R apply(R r) {
+      final SchemaAndValue transformed = process(r, r.valueSchema(), r.value());
 
-            return r.newRecord(
-                    r.topic(),
-                    r.kafkaPartition(),
-                    r.keySchema(),
-                    r.key(),
-                    transformed.schema(),
-                    transformed.value(),
-                    r.timestamp()
-            );
-        }
+      return r.newRecord(
+          r.topic(),
+          r.kafkaPartition(),
+          r.keySchema(),
+          r.key(),
+          transformed.schema(),
+          transformed.value(),
+          r.timestamp()
+          );
     }
+  }
 
 }

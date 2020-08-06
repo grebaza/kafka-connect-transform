@@ -21,24 +21,40 @@ import org.apache.kafka.common.config.ConfigDef;
 import java.util.Map;
 
 public class FieldToJSONStringConfig extends AbstractConfig {
-    public final String inputFieldName;
-    public final String outputFieldName;
+  public final String inputFieldName;
+  public final String outputFieldName;
+  public final boolean schemasEnable;
 
-    public FieldToJSONStringConfig(Map<String, ?> settings) {
-        super(config(), settings);
-        this.inputFieldName = getString(INPUT_FIELD_NAME_CONF);
-        this.outputFieldName = getString(OUTPUT_FIELD_NAME_CONF);
-    }
+  public static final String INPUT_FIELD_NAME_CONFIG = "input.field.name";
+  static final String INPUT_FIELD_NAME_DOC = "The field on the struct to be JSON stringify. ";
+  public static final String OUTPUT_FIELD_NAME_CONFIG = "output.field.name";
+  static final String OUTPUT_FIELD_NAME_DOC = "The field to place the JSON stringify value into.";
+  public static final String SCHEMAS_ENABLE_CONFIG = "schemas.enable";
+  public static final String SCHEMAS_ENABLE_DOC = "Flag to determine if the JSON data should include the schema.";
 
-    public static final String INPUT_FIELD_NAME_CONF = "input.field.name";
-    static final String INPUT_FIELD_NAME_DOC = "The field on the struct to be JSON stringify. ";
-    public static final String OUTPUT_FIELD_NAME_CONF = "output.field.name";
-    static final String OUTPUT_FIELD_NAME_DOC = "The field to place the JSON stringify value into.";
+  public FieldToJSONStringConfig(Map<String, ?> settings) {
+    super(config(), settings);
+    this.inputFieldName = getString(INPUT_FIELD_NAME_CONFIG);
+    this.outputFieldName = getString(OUTPUT_FIELD_NAME_CONFIG);
+    this.schemasEnable = getBoolean(SCHEMAS_ENABLE_CONFIG);
+  }
 
-    public static ConfigDef config() {
-        return new ConfigDef()
-                .define(INPUT_FIELD_NAME_CONF, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH, INPUT_FIELD_NAME_DOC)
-                .define(OUTPUT_FIELD_NAME_CONF, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH, OUTPUT_FIELD_NAME_DOC);
-    }
+
+  public static ConfigDef config() {
+
+    return new ConfigDef()
+      .define(
+          INPUT_FIELD_NAME_CONFIG, ConfigDef.Type.STRING,
+          ConfigDef.Importance.HIGH, INPUT_FIELD_NAME_DOC
+       )
+      .define(
+          OUTPUT_FIELD_NAME_CONFIG, ConfigDef.Type.STRING,
+          ConfigDef.Importance.HIGH, OUTPUT_FIELD_NAME_DOC
+       )
+      .define(
+        SCHEMAS_ENABLE_CONFIG, ConfigDef.Type.BOOLEAN, false,
+        ConfigDef.Importance.MEDIUM, SCHEMAS_ENABLE_DOC
+       )
+  }
 
 }
