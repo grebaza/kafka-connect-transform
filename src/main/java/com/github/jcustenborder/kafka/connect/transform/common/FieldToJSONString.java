@@ -40,6 +40,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
 
   FieldToJSONStringConfig config;
   Map<Schema, Schema> schemaCache;
+  JsonConverter converter = new JsonConverter();
 
   @Override
   public ConfigDef config() {
@@ -50,8 +51,6 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   public void close() {
 
   }
-
-  JsonConverter converter = new JsonConverter();
 
   @Override
   public void configure(Map<String, ?> map) {
@@ -65,51 +64,48 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   }
 
   @Override
-  protected SchemaAndValue processString(R record, Schema inputSchema, String input) {
-    return new SchemaAndValue(inputSchema, input);
+  protected SchemaAndValue processStruct(R record, Schema inputSchema, Struct input) {
+    return schemaAndValue(inputSchema, input);
   }
 
   SchemaAndValue schemaAndValue(Schema inputSchema, Struct input) {
-    
     // Input in Object and Struct fashion
-    final Object inputFieldObject = input.get(this.config.inputFieldName);
-    final Struct inputFieldStruct = input.getStruct(this.config.inputFieldName);
+    final Schema outputSchema;
+    final Struct outputValue = new Struct(inputSchema);
 
-    // Schema
-    final Schema outputSchema = this.schemaCache
-      .computeIfAbsent(inputSchema, s -> {
-        final Field inputField = inputSchema.field(this.config.inputFieldName);
-        final SchemaBuilder builder = SchemaBuilder.struct();
-        for (Field elementField : inputSchema.fields()) {
-          builder.field(elementField.name(), elementField.schema());
-        }
-        builder.field(this.config.inputFieldName, inputField.schema());
-        return builder.build();
-      }
-    );
+    final Schema inputFieldSchema = input.schema().field(this.config.inputFieldName).schema();
+    final Object inputFieldValue = input.get(this.config.inputFieldName);
 
-    // Value
-    // Creating outputStruct (all values of struct)
-    final Struct outputStruct = new Struct(outputSchema);
-    for (Field inputField : inputSchema.fields()) {
-      final Object value = input.get(inputField);
-      outputStruct.put(inputField.name(), value);
-    }
-    // Adding the input in JSON string type
-    // Converting to byte buffer
+    final Schema convertedFieldSchema;
+    final Object convertedFieldValue;
+
     final byte[] buffer = this.converter.fromConnectData("dummy",
-        inputFieldStruct.schema(), inputFieldObject);
-    // Encode buffer in UTF_8 string
-    String inputFieldValue = new String(buffer, Charsets.UTF_8);
-    // Append the value in outputStruct
-    outputStruct.put(this.config.inputFieldName, inputFieldValue);
+        inputFieldSchema, inputFieldValue);
 
-    return new SchemaAndValue(outputSchema, outputStruct);
-  }
+    switch (this.config.outputSchemaType) {
+      case STRING:
+        convertedFieldValue = new String(buffer, Charsets.UTF_8);
+        convertedFieldSchema = Schema.OPTIONAL_STRING_SCHEMA;
+        break;
+      case BYTES:
+        convertedFieldValue = buffer;
+        convertedFieldSchema = Schema.OPTIONAL_BYTES_SCHEMA;
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            String.format(
+                "Schema type (%s)'%s' is not supported.",
+                FieldToJSONStringConfig.OUTPUT_SCHEMA_CONFIG,
+                this.config.outputSchemaType
+            )
+        );
+    }
+    //build output struct
+    outputValue.put(this.config.outputFieldName, convertedFieldValue);
+    //TODO: critical and final effort
+    outputSchema = new SchemaBuilder(outputValue.schema().type()).build();
 
-  @Override
-  protected SchemaAndValue processStruct(R record, Schema inputSchema, Struct input) {
-    return schemaAndValue(inputSchema, input);
+    return new SchemaAndValue(outputSchema, outputValue);
   }
 
   @Title("FieldToJSONString(Key)")

@@ -15,8 +15,10 @@
  */
 package com.github.jcustenborder.kafka.connect.transform.common;
 
+import com.github.jcustenborder.kafka.connect.utils.config.ConfigUtils;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.connect.data.Schema;
 
 import java.util.Map;
 
@@ -24,6 +26,7 @@ public class FieldToJSONStringConfig extends AbstractConfig {
   public final String inputFieldName;
   public final String outputFieldName;
   public final boolean schemasEnable;
+  public final Schema.Type outputSchemaType;
 
   public static final String INPUT_FIELD_NAME_CONFIG = "input.field.name";
   static final String INPUT_FIELD_NAME_DOC = "The field on the struct to be JSON stringify. ";
@@ -31,12 +34,15 @@ public class FieldToJSONStringConfig extends AbstractConfig {
   static final String OUTPUT_FIELD_NAME_DOC = "The field to place the JSON stringify value into.";
   public static final String SCHEMAS_ENABLE_CONFIG = "schemas.enable";
   public static final String SCHEMAS_ENABLE_DOC = "Flag to determine if the JSON data should include the schema.";
+  public static final String OUTPUT_SCHEMA_CONFIG = "output.schema.type";
+  public static final String OUTPUT_SCHEMA_DOC = "The connect schema type to output the converted JSON as.";
 
   public FieldToJSONStringConfig(Map<String, ?> settings) {
     super(config(), settings);
     this.inputFieldName = getString(INPUT_FIELD_NAME_CONFIG);
     this.outputFieldName = getString(OUTPUT_FIELD_NAME_CONFIG);
     this.schemasEnable = getBoolean(SCHEMAS_ENABLE_CONFIG);
+    this.outputSchemaType = ConfigUtils.getEnum(Schema.Type.class, this, OUTPUT_SCHEMA_CONFIG);
   }
 
 
