@@ -26,6 +26,7 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.SchemaBuilder;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.slf4j.Logger;
@@ -100,10 +101,16 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
             )
         );
     }
+    //build output schema
+    Schema updatedSchema = schemaUpdateCache.get(inputSchema);
+    final SchemaBuilder builder = SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
+    builder.field(this.config.outputFieldName, convertedFieldSchema);
+    updatedSchema = builder.build();
+    schemaUpdateCache.put(convertedFieldSchema, updatedSchema);
+    outputSchema = updatedSchema;
+
     //build output struct
     outputValue.put(this.config.outputFieldName, convertedFieldValue);
-    //TODO: critical and final effort
-    outputSchema = new SchemaBuilder(outputValue.schema().type()).build();
 
     return new SchemaAndValue(outputSchema, outputValue);
   }
