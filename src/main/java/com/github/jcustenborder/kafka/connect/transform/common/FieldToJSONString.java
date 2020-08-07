@@ -15,11 +15,14 @@
  */
 package com.github.jcustenborder.kafka.connect.transform.common;
 
+import com.github.jcustenborder.kafka.common.cache.XSynchronizedCache;
 import com.github.jcustenborder.kafka.connect.utils.config.Description;
 import com.github.jcustenborder.kafka.connect.utils.config.DocumentationTip;
 import com.github.jcustenborder.kafka.connect.utils.config.Title;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
+import org.apache.kafka.common.cache.Cache;
+import org.apache.kafka.common.cache.LRUCache;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
@@ -41,6 +44,8 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
 
   FieldToJSONStringConfig config;
   Map<Schema, Schema> schemaCache;
+  //Try: private Cache<Schema, Schema> schemaCache;
+
   JsonConverter converter = new JsonConverter();
 
   @Override
@@ -57,7 +62,8 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   public void configure(Map<String, ?> map) {
     this.config = new FieldToJSONStringConfig(map);
     this.schemaCache = new HashMap<>();
-    // schemaCache = new SynchronizedCache<>(new LRUCache<>(16));
+    //Try: this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
+
     // JsonConverter setup
     Map<String, Object> settingsClone = new LinkedHashMap<>(map);
     settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
@@ -106,7 +112,6 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     log.trace(String.format("value: %s", convertedFieldValue.toString()));
 
     // build output schema
-    // outputSchema = outputSchemaCache.get(inputSchema);
     outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
       final SchemaBuilder builder =
         SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
@@ -116,8 +121,6 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
       builder.field(this.config.outputFieldName, convertedFieldSchema);
       return builder.build();
     });
-
-    // outputSchemaCache.put(convertedFieldSchema, updatedSchema);
 
     // build output value
     outputValue = new Struct(outputSchema);
