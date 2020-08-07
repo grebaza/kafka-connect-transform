@@ -56,11 +56,12 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   @Override
   public void configure(Map<String, ?> map) {
     this.config = new FieldToJSONStringConfig(map);
-    this.schemaCache = new HashMap<>(); //TODO: Review
+    this.schemaCache = new HashMap<>();
+    // schemaCache = new SynchronizedCache<>(new LRUCache<>(16));
     // JsonConverter setup
     Map<String, Object> settingsClone = new LinkedHashMap<>(map);
     settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
-        this.config.schemasEnable);
+                      this.config.schemasEnable);
     this.converter.configure(settingsClone, false);
   }
 
@@ -72,7 +73,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   SchemaAndValue schemaAndValue(Schema inputSchema, Struct input) {
     // Input in Object and Struct fashion
     final Schema outputSchema;
-    final Struct outputValue = new Struct(inputSchema);
+    final Struct outputValue;
 
     final Schema inputFieldSchema = input.schema().field(this.config.inputFieldName).schema();
     final Object inputFieldValue = input.get(this.config.inputFieldName);
@@ -80,6 +81,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     final Schema convertedFieldSchema;
     final Object convertedFieldValue;
 
+    // Convert to JSON
     final byte[] buffer = this.converter.fromConnectData("dummy",
         inputFieldSchema, inputFieldValue);
 
@@ -101,19 +103,32 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
             )
         );
     }
-    //build output schema
-    Schema updatedSchema = schemaUpdateCache.get(inputSchema);
-    final SchemaBuilder builder = SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
-    builder.field(this.config.outputFieldName, convertedFieldSchema);
-    updatedSchema = builder.build();
-    schemaUpdateCache.put(convertedFieldSchema, updatedSchema);
-    outputSchema = updatedSchema;
 
-    //build output struct
+    // build output schema
+    // outputSchema = outputSchemaCache.get(inputSchema);
+    outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
+      final SchemaBuilder builder =
+        SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
+      for (Field field : inputSchema.fields()) {
+        builder.field(field.name(), field.schema());
+      }
+      builder.field(this.config.outputFieldName, convertedFieldSchema);
+      return builder.build();
+    });
+
+    // outputSchemaCache.put(convertedFieldSchema, updatedSchema);
+
+    // build output value
+    outputValue = new Struct(outputSchema);
+    for (Field field : inputSchema.fields()) {
+      final Object value = input.get(field);
+      outputValue.put(field.name(), value);
+    }
     outputValue.put(this.config.outputFieldName, convertedFieldValue);
 
     return new SchemaAndValue(outputSchema, outputValue);
   }
+
 
   @Title("FieldToJSONString(Key)")
   @Description("This transformation is used to extract a field from a "+
