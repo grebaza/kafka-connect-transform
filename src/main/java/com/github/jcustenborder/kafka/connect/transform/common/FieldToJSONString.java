@@ -82,8 +82,8 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     final Object convertedFieldValue;
 
     // Convert to JSON
-    final byte[] buffer = this.converter.fromConnectData("dummy",
-        inputFieldSchema, inputFieldValue);
+    final byte[] buffer = this.converter
+      .fromConnectData("dummy", inputFieldSchema, inputFieldValue);
 
     switch (this.config.outputSchemaType) {
       case STRING:
@@ -103,6 +103,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
             )
         );
     }
+    log.trace(String.format("value: %s", convertedFieldValue.toString()));
 
     // build output schema
     // outputSchema = outputSchemaCache.get(inputSchema);
