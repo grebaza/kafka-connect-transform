@@ -19,53 +19,59 @@ import com.github.jcustenborder.kafka.connect.utils.config.ConfigKeyBuilder;
 import com.github.jcustenborder.kafka.connect.utils.config.ConfigUtils;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Schema;
 
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class FieldToJSONStringConfig extends AbstractConfig {
-  private static final String WHOLE_VALUE_CAST = null;
   private enum FieldType {
     OUTPUT
   }
-  private static final Set<Schema.Type> SUPPORTED_CAST_OUTPUT_TYPES = EnumSet.of(
-    Schema.Type.STRING, Schema.Type.BYTES
-  );
+  public static final class FieldSettings {
+    public String outputName;
+    public Schema.Type outputSchemaT;
+  }
+  private static final Set<Schema.Type> SUPPORTED_CAST_OUTPUT_TYPES =
+    EnumSet.of(Schema.Type.STRING, Schema.Type.BYTES);
 
-  public final String inputFieldName;
+  public final String spec;
   public final boolean schemasEnable;
-  //public final Schema.Type outputSchemaType;
+  public Map<String, FieldSettings> conversions;
 
   public static final String SPEC_CONFIG = "spec";
-  public static final String SPEC_DOC = "The field on the struct to be JSON" +
-    " stringify. ";
+  public static final String SPEC_DOC =
+    "The field on the struct to be JSON stringified.";
   public static final String SCHEMAS_ENABLE_CONFIG = "schemas.enable";
-  public static final String SCHEMAS_ENABLE_DOC = "Flag to determine if the" +
-    " JSON data should include the schema.";
+  public static final String SCHEMAS_ENABLE_DOC =
+    "Flag to determine if the JSON data should include the schema.";
 
   public FieldToJSONStringConfig(Map<String, ?> settings) {
     super(config(), settings);
-    this.inputFieldName = getString(INPUT_FIELD_NAME_CONFIG);
+    this.spec = getString(SPEC_CONFIG);
     this.schemasEnable = getBoolean(SCHEMAS_ENABLE_CONFIG);
-    //this.outputSchemaType = ConfigUtils.getEnum(
-    //  Schema.Type.class, this, OUTPUT_SCHEMA_CONFIG
-    //);
+    this.conversions = parseSpecs(getList(SPEC_CONFIG));
   }
 
-
   public static ConfigDef config() {
-
     return new ConfigDef()
-      .define(SPEC_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE,
+      .define(
+        SPEC_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE,
         new ConfigDef.Validator() {
           @SuppressWarnings("unchecked")
           @Override
           public void ensureValid(String name, Object valueObject) {
             List<String> value = (List<String>) valueObject;
             if (value == null || value.isEmpty()) {
-              throw new ConfigException("Must specify at least one field to JSON cast.");
+              throw new ConfigException(
+                  "Must specify at least one field to JSON-convert.");
             }
-            parseFieldTypes(value);
+            parseSpecs(value);
           }
 
           @Override
@@ -84,44 +90,38 @@ public class FieldToJSONStringConfig extends AbstractConfig {
       );
   }
 
-  private static Map<String, Schema.Type> parseFieldTypes(List<String> mappings) {
-    final Map<String, Schema.Type> m = new HashMap<>();
-    boolean isWholeValueCast = false;
-    for (String mapping : mappings) {
-      final String[] parts = mapping.split(":");
-      if (parts.length > 3) {
-        throw new ConfigException(ReplaceField.ConfigName.RENAME, mappings,
-          "Invalid rename mapping: " + mapping);
-      }
-      // Duda
-      if (parts.length == 1) {
-        Schema.Type targetType = Schema.Type.valueOf(parts[0].trim().toUpperCase(Locale.ROOT));
-        m.put(WHOLE_VALUE_CAST, validCastType(targetType, FieldType.OUTPUT));
-        isWholeValueCast = true;
-      // Fin duda
+  private static Map<String, FieldSettings> parseSpecs(List<String> fields) {
+    final Map<String, FieldSettings> mo = new HashMap<>();
+    final FieldSettings fieldSettings = new FieldSettings();
+    for (String field : fields) {
+      final String[] parts = field.split(":");
+      if (parts.length != 3) {
+        throw new ConfigException(
+            "JSON-convert", fields,
+            "Invalid spec config for field: " + field);
       } else {
         Schema.Type type;
         try {
           type = Schema.Type.valueOf(parts[1].trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-          throw new ConfigException("Invalid type found in casting spec: " + parts[1].trim(), e);
+          throw new ConfigException(
+              "Invalid type found in spec config: " + parts[1].trim(), e);
         }
-        m.put(parts[0].trim(), validCastType(type, FieldType.OUTPUT));
+        fieldSettings.outputSchemaT = validCastType(type, FieldType.OUTPUT);
+        fieldSettings.outputName = parts[2].trim();
+        mo.put(parts[0].trim(), fieldSettings);
       }
     }
-    if (isWholeValueCast && mappings.size() > 1) {
-      throw new ConfigException("Cast transformations that specify a type to cast the entire value to "
-        + "may ony specify a single cast in their spec");
-    }
-    return m;
+    return mo;
   }
 
   private static Schema.Type validCastType(Schema.Type type, FieldType fieldType) {
     switch (fieldType) {
       case OUTPUT:
         if (!SUPPORTED_CAST_OUTPUT_TYPES.contains(type)) {
-          throw new ConfigException("Cast transformation does not support casting to " +
-            type + "; supported types are " + SUPPORTED_CAST_OUTPUT_TYPES);
+          throw new ConfigException(
+              "Transformation does not support " + type + " output-schema" +
+              "; supported types are " + SUPPORTED_CAST_OUTPUT_TYPES);
         }
         break;
     }

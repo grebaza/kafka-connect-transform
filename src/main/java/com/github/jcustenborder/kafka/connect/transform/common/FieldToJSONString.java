@@ -38,13 +38,23 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends BaseTransformation<R> {
   private static final Logger log = LoggerFactory.getLogger(FieldToJSONString.class);
 
+  private static final Map<Schema.Type, Schema> schemaTHandler =
+    new HashMap<>();
+  private static final Map<Schema.Type, Function<byte[], ?>> valueHandler =
+    new HashMap<>();
+
+  private static final Function<byte[], ?> handleBytes = Function.identity();
+  private static final Function<byte[], ?> handleString =
+    a -> new String(a, Charsets.UTF_8);
+
   FieldToJSONStringConfig config;
   Map<Schema, Schema> schemaCache;
-  //Try: private Cache<Schema, Schema> schemaCache;
+  //TRY-1: private Cache<Schema, Schema> schemaCache;
 
   JsonConverter converter = new JsonConverter();
 
@@ -59,16 +69,22 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   }
 
   @Override
-  public void configure(Map<String, ?> map) {
-    this.config = new FieldToJSONStringConfig(map);
+  public void configure(Map<String, ?> settings) {
+    this.config = new FieldToJSONStringConfig(settings);
     this.schemaCache = new HashMap<>();
-    //Try: this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
+    //TRY-1: this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
 
     // JsonConverter setup
-    Map<String, Object> settingsClone = new LinkedHashMap<>(map);
+    Map<String, Object> settingsClone = new LinkedHashMap<>(settings);
     settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
                       this.config.schemasEnable);
     this.converter.configure(settingsClone, false);
+
+    // Handlers setup
+    schemaTHandler.put(Schema.Type.STRING, Schema.OPTIONAL_STRING_SCHEMA);
+    schemaTHandler.put(Schema.Type.BYTES, Schema.OPTIONAL_BYTES_SCHEMA);
+    valueHandler.put(Schema.Type.STRING, handleString);
+    valueHandler.put(Schema.Type.BYTES, handleBytes);
   }
 
   @Override
@@ -77,62 +93,73 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
   }
 
   SchemaAndValue schemaAndValue(Schema inputSchema, Struct input) {
-    // Input in Object and Struct fashion
     final Schema outputSchema;
     final Struct outputValue;
 
-    final Schema inputFieldSchema = input.schema().field(this.config.inputFieldName).schema();
-    final Object inputFieldValue = input.get(this.config.inputFieldName);
-
-    final Schema convertedFieldSchema;
-    final Object convertedFieldValue;
-
-    // Convert to JSON
-    final byte[] buffer = this.converter
-      .fromConnectData("dummy", inputFieldSchema, inputFieldValue);
-
-    switch (this.config.outputSchemaType) {
-      case STRING:
-        convertedFieldValue = new String(buffer, Charsets.UTF_8);
-        convertedFieldSchema = Schema.OPTIONAL_STRING_SCHEMA;
-        break;
-      case BYTES:
-        convertedFieldValue = buffer;
-        convertedFieldSchema = Schema.OPTIONAL_BYTES_SCHEMA;
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            String.format(
-                "Schema type (%s)'%s' is not supported.",
-                FieldToJSONStringConfig.OUTPUT_SCHEMA_CONFIG,
-                this.config.outputSchemaType
-            )
-        );
-    }
-    log.trace(String.format("value: %s", convertedFieldValue.toString()));
-
-    // build output schema
-    outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s -> {
+    // Build output schema
+    outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s1 -> {
       final SchemaBuilder builder =
         SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
+      // input part
       for (Field field : inputSchema.fields()) {
         builder.field(field.name(), field.schema());
       }
-      builder.field(this.config.outputFieldName, convertedFieldSchema);
+      // converted fields
+      for (Map.Entry<String, FieldToJSONStringConfig.FieldSettings>
+          fieldSpec : this.config.conversions.entrySet()) {
+        final FieldToJSONStringConfig.FieldSettings fieldSettings =
+          fieldSpec.getValue();
+        builder.field(
+          fieldSettings.outputName,
+          schemaTHandler.computeIfAbsent(
+            fieldSettings.outputSchemaT, s2 -> {
+              throw new UnsupportedOperationException(
+                  String.format("Schema type '%s' is not supported.",
+                    fieldSettings.outputSchemaT));
+           })
+        );
+      }
       return builder.build();
     });
 
-    // build output value
+    // Build output value (input part)
     outputValue = new Struct(outputSchema);
     for (Field field : inputSchema.fields()) {
       final Object value = input.get(field);
       outputValue.put(field.name(), value);
     }
-    outputValue.put(this.config.outputFieldName, convertedFieldValue);
+
+    // Build output value (converted fields)
+    for (Map.Entry<String, FieldToJSONStringConfig.FieldSettings>
+        fieldSpec : this.config.conversions.entrySet()) {
+      final String field = fieldSpec.getKey();
+      final FieldToJSONStringConfig.FieldSettings fieldSettings =
+        fieldSpec.getValue();
+
+      final Schema inputFieldSchema = input.schema().field(field).schema();
+      final Object inputFieldValue = input.get(field);
+
+      final Object convertedFieldValue;
+
+      // convert to JSON
+      final byte[] buffer = this.converter
+        .fromConnectData("dummy", inputFieldSchema, inputFieldValue);
+
+      convertedFieldValue = valueHandler.computeIfAbsent(
+        fieldSettings.outputSchemaT, s -> {
+          throw new UnsupportedOperationException(
+              String.format("Schema type '%s' is not supported.",
+                fieldSettings.outputSchemaT));
+        }).apply(buffer);
+      log.trace(String.format(
+            "converted value: %s", convertedFieldValue.toString()));
+
+      // update output value
+      outputValue.put(fieldSettings.outputName, convertedFieldValue);
+    }
 
     return new SchemaAndValue(outputSchema, outputValue);
   }
-
 
   @Title("FieldToJSONString(Key)")
   @Description("This transformation is used to extract a field from a "+
