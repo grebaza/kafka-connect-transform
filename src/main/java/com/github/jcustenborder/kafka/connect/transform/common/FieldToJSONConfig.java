@@ -88,8 +88,8 @@ public class FieldToJSONConfig extends AbstractConfig {
 
   private static Map<String, FieldSettings> parseSpecs(List<String> fields) {
     final Map<String, FieldSettings> mo = new HashMap<>();
-    final FieldSettings fieldSettings = new FieldSettings();
     for (String field : fields) {
+      final FieldSettings fieldSettings = new FieldSettings();
       final String[] parts = field.split(":");
       if (parts.length != 3) {
         throw new ConfigException(
