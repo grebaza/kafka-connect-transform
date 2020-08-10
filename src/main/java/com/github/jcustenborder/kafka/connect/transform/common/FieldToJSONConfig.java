@@ -15,13 +15,6 @@
  */
 package com.github.jcustenborder.kafka.connect.transform.common;
 
-import com.github.jcustenborder.kafka.connect.utils.config.ConfigKeyBuilder;
-import com.github.jcustenborder.kafka.connect.utils.config.ConfigUtils;
-import org.apache.kafka.common.config.AbstractConfig;
-import org.apache.kafka.common.config.ConfigDef;
-import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.connect.data.Schema;
-
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -29,7 +22,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-public class FieldToJSONStringConfig extends AbstractConfig {
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.connect.data.Schema;
+
+public class FieldToJSONConfig extends AbstractConfig {
   private enum FieldType {
     OUTPUT
   }
@@ -40,7 +38,6 @@ public class FieldToJSONStringConfig extends AbstractConfig {
   private static final Set<Schema.Type> SUPPORTED_CAST_OUTPUT_TYPES =
     EnumSet.of(Schema.Type.STRING, Schema.Type.BYTES);
 
-  public final String spec;
   public final boolean schemasEnable;
   public Map<String, FieldSettings> conversions;
 
@@ -51,9 +48,8 @@ public class FieldToJSONStringConfig extends AbstractConfig {
   public static final String SCHEMAS_ENABLE_DOC =
     "Flag to determine if the JSON data should include the schema.";
 
-  public FieldToJSONStringConfig(Map<String, ?> settings) {
+  public FieldToJSONConfig(Map<String, ?> settings) {
     super(config(), settings);
-    this.spec = getString(SPEC_CONFIG);
     this.schemasEnable = getBoolean(SCHEMAS_ENABLE_CONFIG);
     this.conversions = parseSpecs(getList(SPEC_CONFIG));
   }
@@ -102,7 +98,8 @@ public class FieldToJSONStringConfig extends AbstractConfig {
       } else {
         Schema.Type type;
         try {
-          type = Schema.Type.valueOf(parts[1].trim().toUpperCase(Locale.ROOT));
+          type = Schema.Type.valueOf(
+              parts[1].trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
           throw new ConfigException(
               "Invalid type found in spec config: " + parts[1].trim(), e);

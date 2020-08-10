@@ -15,44 +15,45 @@
  */
 package com.github.jcustenborder.kafka.connect.transform.common;
 
-import com.github.jcustenborder.kafka.common.cache.XSynchronizedCache;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
+
 import com.github.jcustenborder.kafka.connect.utils.config.Description;
 import com.github.jcustenborder.kafka.connect.utils.config.DocumentationTip;
 import com.github.jcustenborder.kafka.connect.utils.config.Title;
 import com.google.common.base.Charsets;
-import com.google.common.base.Strings;
-import org.apache.kafka.common.cache.Cache;
-import org.apache.kafka.common.cache.LRUCache;
+
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.SchemaBuilder;
-import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.json.JsonConverter;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
+public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransformation<R> {
+  private static final Logger log = LoggerFactory.getLogger(FieldToJSON.class);
 
-public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends BaseTransformation<R> {
-  private static final Logger log = LoggerFactory.getLogger(FieldToJSONString.class);
-
-  private static final Map<Schema.Type, Schema> schemaTHandler =
+  private static final Map<Schema.Type, Schema> FIELD_SCHEMA_MAPPING =
     new HashMap<>();
-  private static final Map<Schema.Type, Function<byte[], ?>> valueHandler =
+  private static final Map<Schema.Type, Function<byte[], ?>> FIELD_MAPPING_FUNC =
     new HashMap<>();
 
-  private static final Function<byte[], ?> handleBytes = Function.identity();
-  private static final Function<byte[], ?> handleString =
-    a -> new String(a, Charsets.UTF_8);
+  // Handlers setup
+  static {
+    FIELD_SCHEMA_MAPPING.put(Schema.Type.STRING, Schema.OPTIONAL_STRING_SCHEMA);
+    FIELD_SCHEMA_MAPPING.put(Schema.Type.BYTES, Schema.OPTIONAL_BYTES_SCHEMA);
+    FIELD_MAPPING_FUNC.put(Schema.Type.STRING, a -> new String(a, Charsets.UTF_8));
+    FIELD_MAPPING_FUNC.put(Schema.Type.BYTES, Function.identity());
+  }
 
-  FieldToJSONStringConfig config;
+  FieldToJSONConfig config;
   Map<Schema, Schema> schemaCache;
   //TRY-1: private Cache<Schema, Schema> schemaCache;
 
@@ -60,7 +61,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
 
   @Override
   public ConfigDef config() {
-    return FieldToJSONStringConfig.config();
+    return FieldToJSONConfig.config();
   }
 
   @Override
@@ -70,21 +71,16 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
 
   @Override
   public void configure(Map<String, ?> settings) {
-    this.config = new FieldToJSONStringConfig(settings);
+    this.config = new FieldToJSONConfig(settings);
     this.schemaCache = new HashMap<>();
     //TRY-1: this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
 
     // JsonConverter setup
     Map<String, Object> settingsClone = new LinkedHashMap<>(settings);
-    settingsClone.put(FieldToJSONStringConfig.SCHEMAS_ENABLE_CONFIG,
+    settingsClone.put(FieldToJSONConfig.SCHEMAS_ENABLE_CONFIG,
                       this.config.schemasEnable);
     this.converter.configure(settingsClone, false);
 
-    // Handlers setup
-    schemaTHandler.put(Schema.Type.STRING, Schema.OPTIONAL_STRING_SCHEMA);
-    schemaTHandler.put(Schema.Type.BYTES, Schema.OPTIONAL_BYTES_SCHEMA);
-    valueHandler.put(Schema.Type.STRING, handleString);
-    valueHandler.put(Schema.Type.BYTES, handleBytes);
   }
 
   @Override
@@ -105,13 +101,13 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
         builder.field(field.name(), field.schema());
       }
       // converted fields
-      for (Map.Entry<String, FieldToJSONStringConfig.FieldSettings>
+      for (Map.Entry<String, FieldToJSONConfig.FieldSettings>
           fieldSpec : this.config.conversions.entrySet()) {
-        final FieldToJSONStringConfig.FieldSettings fieldSettings =
+        final FieldToJSONConfig.FieldSettings fieldSettings =
           fieldSpec.getValue();
         builder.field(
           fieldSettings.outputName,
-          schemaTHandler.computeIfAbsent(
+          FIELD_SCHEMA_MAPPING.computeIfAbsent(
             fieldSettings.outputSchemaT, s2 -> {
               throw new UnsupportedOperationException(
                   String.format("Schema type '%s' is not supported.",
@@ -130,10 +126,10 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     }
 
     // Build output value (converted fields)
-    for (Map.Entry<String, FieldToJSONStringConfig.FieldSettings>
+    for (Map.Entry<String, FieldToJSONConfig.FieldSettings>
         fieldSpec : this.config.conversions.entrySet()) {
       final String field = fieldSpec.getKey();
-      final FieldToJSONStringConfig.FieldSettings fieldSettings =
+      final FieldToJSONConfig.FieldSettings fieldSettings =
         fieldSpec.getValue();
 
       final Schema inputFieldSchema = input.schema().field(field).schema();
@@ -145,7 +141,7 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
       final byte[] buffer = this.converter
         .fromConnectData("dummy", inputFieldSchema, inputFieldValue);
 
-      convertedFieldValue = valueHandler.computeIfAbsent(
+      convertedFieldValue = FIELD_MAPPING_FUNC.computeIfAbsent(
         fieldSettings.outputSchemaT, s -> {
           throw new UnsupportedOperationException(
               String.format("Schema type '%s' is not supported.",
@@ -161,13 +157,13 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     return new SchemaAndValue(outputSchema, outputValue);
   }
 
-  @Title("FieldToJSONString(Key)")
+  @Title("FieldToJSON(Key)")
   @Description("This transformation is used to extract a field from a "+
-               "nested struct and append it to the parent struct in "+
-               "JSON string.")
+               "nested struct convert into JSON string and append it to " +
+               "the parent struct.")
   @DocumentationTip("This transformation is used to manipulate fields in "+
                     "the Key of the record.")
-  public static class Key<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
+  public static class Key<R extends ConnectRecord<R>> extends FieldToJSON<R> {
 
     @Override
     public R apply(R r) {
@@ -185,11 +181,13 @@ public abstract class FieldToJSONString<R extends ConnectRecord<R>> extends Base
     }
   }
 
-  @Title("FieldToJSONString(Value)")
-  @Description("This transformation is used to extract a field from a " +
-    "nested struct and append it to the parent struct in " +
-    "JSON string.")
-  public static class Value<R extends ConnectRecord<R>> extends FieldToJSONString<R> {
+  @Title("FieldToJSON(Value)")
+  @Description("This transformation is used to extract a field from a "+
+               "nested struct convert into JSON string and append it to " +
+               "the parent struct.")
+  @DocumentationTip("This transformation is used to manipulate fields in "+
+                    "the Value of the record.")
+  public static class Value<R extends ConnectRecord<R>> extends FieldToJSON<R> {
 
     @Override
     public R apply(R r) {
