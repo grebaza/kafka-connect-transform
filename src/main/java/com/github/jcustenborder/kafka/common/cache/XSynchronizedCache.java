@@ -1,4 +1,6 @@
-/*
+/**
+ * Copyright © 2021 Guillermo Rebaza (grebaza@gmail.com)
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -17,27 +19,26 @@
 
 package com.github.jcustenborder.kafka.common.cache;
 
-import org.apache.kafka.common.cache.Cache;
-import org.apache.kafka.common.cache.LRUCache;
-import org.apache.kafka.common.cache.SynchronizedCache;
-
 import java.util.function.Function;
+
+import org.apache.kafka.common.cache.Cache;
+import org.apache.kafka.common.cache.SynchronizedCache;
 
 
 public class XSynchronizedCache<K, V> extends SynchronizedCache<K, V> {
 
-  XSynchronizedCache(Cache<K, V> underlying) {
+  public XSynchronizedCache(Cache<K, V> underlying) {
     super(underlying);
   }
 
   public V computeIfAbsent(K key,
                            Function<? super K, ? extends V> mappingFunction) {
-    if (this.get(key) == null) {
+    if (get(key) == null) {
       V newValue = mappingFunction.apply(key);
       if (newValue != null)
-        this.put(key, newValue);
+        put(key, newValue);
     }
 
-    return this.get(key);
+    return get(key);
   }
 }

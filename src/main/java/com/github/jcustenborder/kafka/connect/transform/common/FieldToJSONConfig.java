@@ -36,17 +36,17 @@ public class FieldToJSONConfig extends AbstractConfig {
     public Schema.Type outputSchemaT;
   }
   private static final Set<Schema.Type> SUPPORTED_CAST_OUTPUT_TYPES =
-    EnumSet.of(Schema.Type.STRING, Schema.Type.BYTES);
+      EnumSet.of(Schema.Type.STRING, Schema.Type.BYTES);
 
   public final boolean schemasEnable;
   public Map<String, FieldSettings> conversions;
 
   public static final String SPEC_CONFIG = "spec";
   public static final String SPEC_DOC =
-    "The field on the struct to be JSON stringified.";
+      "The field on the struct to be JSON stringified.";
   public static final String SCHEMAS_ENABLE_CONFIG = "schemas.enable";
   public static final String SCHEMAS_ENABLE_DOC =
-    "Flag to determine if the JSON data should include the schema.";
+      "Flag to determine if the JSON data should include the schema.";
 
   public FieldToJSONConfig(Map<String, ?> settings) {
     super(config(), settings);

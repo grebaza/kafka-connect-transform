@@ -1,5 +1,6 @@
 /**
- * Copyright © 2017 Jeremy Custenborder (jcustenborder@gmail.com)
+ * Copyright © 2020 Guillermo Rebaza (grebaza@gmail.com)
+ * Adapted from com.github.jcustenborder.kafka.connect.transform.common.ToJSON
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +21,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+import com.github.jcustenborder.kafka.common.cache.XSynchronizedCache;
 import com.github.jcustenborder.kafka.connect.utils.config.Description;
 import com.github.jcustenborder.kafka.connect.utils.config.DocumentationTip;
 import com.github.jcustenborder.kafka.connect.utils.config.Title;
 import com.google.common.base.Charsets;
 
+import org.apache.kafka.common.cache.LRUCache;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
@@ -41,9 +44,9 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
   private static final Logger log = LoggerFactory.getLogger(FieldToJSON.class);
 
   private static final Map<Schema.Type, Schema> FIELD_SCHEMA_MAPPING =
-    new HashMap<>();
+      new HashMap<>();
   private static final Map<Schema.Type, Function<byte[], ?>> FIELD_MAPPING_FUNC =
-    new HashMap<>();
+      new HashMap<>();
 
   // Handlers setup
   static {
@@ -54,8 +57,8 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
   }
 
   FieldToJSONConfig config;
-  Map<Schema, Schema> schemaCache;
-  //TRY-1: private Cache<Schema, Schema> schemaCache;
+  //private Map<Schema, Schema> schemaCache;
+  private XSynchronizedCache<Schema, Schema> schemaCache;
 
   JsonConverter converter = new JsonConverter();
 
@@ -72,8 +75,8 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
   @Override
   public void configure(Map<String, ?> settings) {
     this.config = new FieldToJSONConfig(settings);
-    this.schemaCache = new HashMap<>();
-    //TRY-1: this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
+    //this.schemaCache = new HashMap<>();
+    this.schemaCache = new XSynchronizedCache<>(new LRUCache<>(16));
 
     // JsonConverter setup
     Map<String, Object> settingsClone = new LinkedHashMap<>(settings);
@@ -95,7 +98,7 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
     // Build output schema
     outputSchema = this.schemaCache.computeIfAbsent(inputSchema, s1 -> {
       final SchemaBuilder builder =
-        SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
+          SchemaUtil.copySchemaBasics(inputSchema, SchemaBuilder.struct());
       // input part
       for (Field field : inputSchema.fields()) {
         builder.field(field.name(), field.schema());
@@ -104,15 +107,15 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
       for (Map.Entry<String, FieldToJSONConfig.FieldSettings>
           fieldSpec : this.config.conversions.entrySet()) {
         final FieldToJSONConfig.FieldSettings fieldSettings =
-          fieldSpec.getValue();
+            fieldSpec.getValue();
         builder.field(
-          fieldSettings.outputName,
-          FIELD_SCHEMA_MAPPING.computeIfAbsent(
-            fieldSettings.outputSchemaT, s2 -> {
-              throw new UnsupportedOperationException(
-                  String.format("Schema type '%s' is not supported.",
-                    fieldSettings.outputSchemaT));
-           })
+            fieldSettings.outputName,
+            FIELD_SCHEMA_MAPPING.computeIfAbsent(
+              fieldSettings.outputSchemaT, s2 -> {
+                throw new UnsupportedOperationException(
+                    String.format("Schema type '%s' is not supported.",
+                      fieldSettings.outputSchemaT));
+              })
         );
       }
       return builder.build();
@@ -130,7 +133,7 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
         fieldSpec : this.config.conversions.entrySet()) {
       final String field = fieldSpec.getKey();
       final FieldToJSONConfig.FieldSettings fieldSettings =
-        fieldSpec.getValue();
+          fieldSpec.getValue();
 
       final Schema inputFieldSchema = input.schema().field(field).schema();
       final Object inputFieldValue = input.get(field);
@@ -158,10 +161,10 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
   }
 
   @Title("FieldToJSON(Key)")
-  @Description("This transformation is used to extract a field from a "+
+  @Description("This transformation is used to extract a field from a " +
                "nested struct convert into JSON string and append it to " +
                "the parent struct.")
-  @DocumentationTip("This transformation is used to manipulate fields in "+
+  @DocumentationTip("This transformation is used to manipulate fields in " +
                     "the Key of the record.")
   public static class Key<R extends ConnectRecord<R>> extends FieldToJSON<R> {
 
@@ -182,10 +185,10 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
   }
 
   @Title("FieldToJSON(Value)")
-  @Description("This transformation is used to extract a field from a "+
+  @Description("This transformation is used to extract a field from a " +
                "nested struct convert into JSON string and append it to " +
                "the parent struct.")
-  @DocumentationTip("This transformation is used to manipulate fields in "+
+  @DocumentationTip("This transformation is used to manipulate fields in " +
                     "the Value of the record.")
   public static class Value<R extends ConnectRecord<R>> extends FieldToJSON<R> {
 
