@@ -10,21 +10,21 @@
       <version>2.8.0-1</version>
     </parent>
 
-    <groupId>com.github.roniepaolo</groupId>
-    <artifactId>kafka-connect-transform-json</artifactId>
+    <groupId>com.github.grebaza</groupId>
+    <artifactId>kafka-connect-transform</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 
-    <name>Kafka Connect JSON-related SMT</name>
-    <url>https://github.com/roniepaolo/kafka-connect-transform-json</url>
+    <name>Kafka Connect SMTs</name>
+    <url>https://github.com/grebaza/kafka-connect-transform</url>
     <inceptionYear>2020</inceptionYear>
-    <description>JSON-related transformations for Kafka Connect.</description>
+    <description>Transformations for Kafka Connect.</description>
 
     <developers>
       <developer>
-        <id>roniepaolo</id>
-        <name>Ronie Arauco</name>
-        <email>rarauco@gmail.com</email>
-        <url>https://github.com/roniepaolo</url>
+        <id>grebaza</id>
+        <name>Guillermo Rebaza</name>
+        <email>grebaza@gmail.com</email>
+        <url>https://github.com/grebaza</url>
         <roles>
           <role>Committer</role>
         </roles>
@@ -40,13 +40,13 @@
 
     <issueManagement>
       <system>github</system>
-      <url>https://github.com/roniepaolo/kafka-connect-transform-json/issues</url>
+      <url>https://github.com/grebaza/kafka-connect-transform/issues</url>
     </issueManagement>
 
     <scm>
-      <url>https://github.com/roniepaolo/kafka-connect-transform-json</url>
-      <connection>scm:git:https://github.com/roniepaolo/kafka-connect-transform-json.git</connection>
-      <developerConnection>scm:git:git@github.com:roniepaolo/kafka-connect-transform-json.git</developerConnection>
+      <url>https://github.com/grebaza/kafka-connect-transform</url>
+      <connection>scm:git:https://github.com/grebaza/kafka-connect-transform.git</connection>
+      <developerConnection>scm:git:git@github.com:grebaza/kafka-connect-transform.git</developerConnection>
     </scm>
 
     <dependencies>

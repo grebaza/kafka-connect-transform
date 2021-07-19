@@ -111,10 +111,10 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
         builder.field(
             fieldSettings.outputName,
             FIELD_SCHEMA_MAPPING.computeIfAbsent(
-              fieldSettings.outputSchemaT, s2 -> {
+              fieldSettings.outputSchema, s2 -> {
                 throw new UnsupportedOperationException(
                     String.format("Schema type '%s' is not supported.",
-                      fieldSettings.outputSchemaT));
+                      fieldSettings.outputSchema));
               })
         );
       }
@@ -145,10 +145,10 @@ public abstract class FieldToJSON<R extends ConnectRecord<R>> extends BaseTransf
         .fromConnectData("dummy", inputFieldSchema, inputFieldValue);
 
       convertedFieldValue = FIELD_MAPPING_FUNC.computeIfAbsent(
-        fieldSettings.outputSchemaT, s -> {
+        fieldSettings.outputSchema, s -> {
           throw new UnsupportedOperationException(
               String.format("Schema type '%s' is not supported.",
-                fieldSettings.outputSchemaT));
+                fieldSettings.outputSchema));
         }).apply(buffer);
       log.trace(String.format(
             "converted value: %s", convertedFieldValue.toString()));

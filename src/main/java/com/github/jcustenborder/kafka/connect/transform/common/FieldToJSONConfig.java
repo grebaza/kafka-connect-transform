@@ -33,7 +33,7 @@ public class FieldToJSONConfig extends AbstractConfig {
   }
   public static final class FieldSettings {
     public String outputName;
-    public Schema.Type outputSchemaT;
+    public Schema.Type outputSchema;
   }
   private static final Set<Schema.Type> SUPPORTED_CAST_OUTPUT_TYPES =
       EnumSet.of(Schema.Type.STRING, Schema.Type.BYTES);
@@ -43,7 +43,9 @@ public class FieldToJSONConfig extends AbstractConfig {
 
   public static final String SPEC_CONFIG = "spec";
   public static final String SPEC_DOC =
-      "The field on the struct to be JSON stringified.";
+      "List of triads describing input and output fields. " +
+      "Input fields are JSON stringified. " +
+      "Output fields Schema can be 'string' or 'bytes'.";
   public static final String SCHEMAS_ENABLE_CONFIG = "schemas.enable";
   public static final String SCHEMAS_ENABLE_DOC =
       "Flag to determine if the JSON data should include the schema.";
@@ -65,20 +67,20 @@ public class FieldToJSONConfig extends AbstractConfig {
             List<String> value = (List<String>) valueObject;
             if (value == null || value.isEmpty()) {
               throw new ConfigException(
-                  "Must specify at least one field to JSON-convert.");
+                  "Must specify at least one field for FieldToJSON.");
             }
             parseSpecs(value);
           }
 
           @Override
           public String toString() {
-            return "list of colon-delimited pairs, e.g. " +
+            return "list of colon-delimited triads, e.g. " +
               "<code>foo:bar:baz,abc:rst:xyz</code>";
           }
         },
         ConfigDef.Importance.HIGH,
-          "List of fields,schema type, and new fields' names " +
-          "field1:schema-type:new-field1,field1:schema-type:new-field1."
+          "List of triads (input field and new field schema, and name) " +
+          "input_field:new_field_schema:new_field_name."
       )
       .define(
         SCHEMAS_ENABLE_CONFIG, ConfigDef.Type.BOOLEAN, false,
@@ -86,15 +88,15 @@ public class FieldToJSONConfig extends AbstractConfig {
       );
   }
 
-  private static Map<String, FieldSettings> parseSpecs(List<String> fields) {
+  private static Map<String, FieldSettings> parseSpecs(List<String> triads) {
     final Map<String, FieldSettings> mo = new HashMap<>();
-    for (String field : fields) {
+    for (String triad : triads) {
       final FieldSettings fieldSettings = new FieldSettings();
-      final String[] parts = field.split(":");
+      final String[] parts = triad.split(":");
       if (parts.length != 3) {
         throw new ConfigException(
-            "JSON-convert", fields,
-            "Invalid spec config for field: " + field);
+            "FieldToJSON", triads,
+            "Invalid spec config for triad: " + triad);
       } else {
         Schema.Type type;
         try {
@@ -102,9 +104,13 @@ public class FieldToJSONConfig extends AbstractConfig {
               parts[1].trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
           throw new ConfigException(
-              "Invalid type found in spec config: " + parts[1].trim(), e);
+              String.format(
+                  "Config (%s): schema '%s' for field '%s' is not supported.",
+                  FieldToJSONConfig.SPEC_CONFIG,
+                  parts[1].trim(),
+                  parts[0].trim()));
         }
-        fieldSettings.outputSchemaT = validCastType(type, FieldType.OUTPUT);
+        fieldSettings.outputSchema = validCastType(type, FieldType.OUTPUT);
         fieldSettings.outputName = parts[2].trim();
         mo.put(parts[0].trim(), fieldSettings);
       }
@@ -117,7 +123,7 @@ public class FieldToJSONConfig extends AbstractConfig {
       case OUTPUT:
         if (!SUPPORTED_CAST_OUTPUT_TYPES.contains(type)) {
           throw new ConfigException(
-              "Transformation does not support " + type + " output-schema" +
+              "Transformation does not support " + type + " Schema type" +
               "; supported types are " + SUPPORTED_CAST_OUTPUT_TYPES);
         }
         break;
